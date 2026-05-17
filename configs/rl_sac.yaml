@@ -1,0 +1,17 @@
+surrogate_path: models/surrogate_cnn.pt
+output_path: models/sac_scramjet_env.zip
+algorithm: sac
+total_timesteps: 2000
+seed: 11
+env:
+  max_steps: 120
+  sensor_height: 8
+  sensor_width: 16
+  initial_mach_range: [4.0, 8.0]
+  initial_altitude_range: [10000.0, 30000.0]
+  initial_ramp_angle_range: [6.0, 14.0]
+  max_delta_angle_deg: 0.5
+  actuator_time_constant: 0.35
+  max_angle_rate_deg_per_step: 0.75
+  min_ramp_angle_deg: 4.0
+  max_ramp_angle_deg: 18.0

@@ -1,0 +1,23 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      sampleDict;
+}
+
+type sets;
+libs ("libsampling.so");
+interpolationScheme cellPoint;
+setFormat csv;
+fields (p T);
+
+sets
+(
+    inletGrid
+    {
+        type    cloud;
+        axis    xyz;
+        points  (); // Replace with generated grid points before running postProcess -func sample
+    }
+);

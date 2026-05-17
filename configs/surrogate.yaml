@@ -1,0 +1,10 @@
+dataset_path: data/processed/synthetic_inlet.h5
+model_path: models/surrogate_cnn.pt
+model_type: cnn
+epochs: 3
+batch_size: 32
+learning_rate: 0.001
+validation_fraction: 0.15
+seed: 7
+field_loss_weight: 1.0
+metric_loss_weight: 0.25

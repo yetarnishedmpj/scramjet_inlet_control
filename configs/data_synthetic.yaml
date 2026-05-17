@@ -1,0 +1,9 @@
+output_path: data/processed/synthetic_inlet.h5
+num_samples: 512
+height: 32
+width: 64
+seed: 42
+ranges:
+  mach: [4.0, 8.0]
+  altitude_m: [10000.0, 30000.0]
+  ramp_angle_deg: [4.0, 18.0]
