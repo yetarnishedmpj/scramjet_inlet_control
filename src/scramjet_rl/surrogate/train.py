@@ -10,6 +10,7 @@ from tqdm import trange
 
 from scramjet_rl.config import ensure_parent
 from scramjet_rl.data.dataset import InletFieldDataset
+from scramjet_rl.data.splits import load_split_indices
 from scramjet_rl.logging import append_csv, timestamp, write_json
 from scramjet_rl.surrogate.models import build_model
 
@@ -18,11 +19,16 @@ def train_surrogate(config: dict) -> Path:
     torch.manual_seed(int(config.get("seed", 0)))
     dataset = InletFieldDataset(config["dataset_path"])
     num_items = len(dataset)
-    rng = np.random.default_rng(int(config.get("seed", 0)))
-    indices = rng.permutation(num_items)
-    val_count = max(1, int(num_items * float(config.get("validation_fraction", 0.15))))
-    val_indices = indices[:val_count]
-    train_indices = indices[val_count:]
+    if "split_dir" in config:
+        splits = load_split_indices(config["split_dir"])
+        train_indices = splits["train"]
+        val_indices = splits["val"]
+    else:
+        rng = np.random.default_rng(int(config.get("seed", 0)))
+        indices = rng.permutation(num_items)
+        val_count = max(1, int(num_items * float(config.get("validation_fraction", 0.15))))
+        val_indices = indices[:val_count]
+        train_indices = indices[val_count:]
 
     train_dataset = InletFieldDataset(config["dataset_path"], train_indices)
     val_dataset = InletFieldDataset(config["dataset_path"], val_indices)

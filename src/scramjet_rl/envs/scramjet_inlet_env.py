@@ -7,7 +7,7 @@ import numpy as np
 from gymnasium import spaces
 
 from scramjet_rl.data.synthetic import isa_density_kg_m3
-from scramjet_rl.surrogate.predictor import SurrogatePredictor
+from scramjet_rl.surrogate.predictor import EnsembleSurrogatePredictor, SurrogatePredictor
 
 
 @dataclass(frozen=True)
@@ -23,15 +23,25 @@ class EnvConfig:
     max_angle_rate_deg_per_step: float = 0.75
     min_ramp_angle_deg: float = 4.0
     max_ramp_angle_deg: float = 18.0
+    uncertainty_penalty_weight: float = 0.0
 
 
 class ScramjetInletEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    def __init__(self, surrogate_path: str, config: EnvConfig | None = None) -> None:
+    def __init__(
+        self,
+        surrogate_path: str | list[str],
+        config: EnvConfig | None = None,
+    ) -> None:
         super().__init__()
         self.config = config or EnvConfig()
-        self.predictor = SurrogatePredictor(surrogate_path)
+        if isinstance(surrogate_path, list):
+            self.predictor = EnsembleSurrogatePredictor(surrogate_path)
+            self.uses_ensemble = True
+        else:
+            self.predictor = SurrogatePredictor(surrogate_path)
+            self.uses_ensemble = False
         sensor_size = 2 * self.config.sensor_height * self.config.sensor_width
         self.observation_space = spaces.Box(
             low=-np.inf,
@@ -48,6 +58,7 @@ class ScramjetInletEnv(gym.Env):
         self.angle_rate = 0.0
         self.last_metrics = np.zeros(4, dtype=np.float32)
         self.last_fields = np.zeros((2, 32, 64), dtype=np.float32)
+        self.last_uncertainty = 0.0
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
@@ -89,7 +100,8 @@ class ScramjetInletEnv(gym.Env):
         observation = self._observe()
         shock_error, pressure_recovery, unstart_probability, efficiency = self.last_metrics
         movement_penalty = 0.25 * abs(self.angle_rate) + 0.1 * abs(self.angle_rate - previous_rate)
-        reward = 10.0 * efficiency + 2.0 * pressure_recovery - movement_penalty
+        uncertainty_penalty = self.config.uncertainty_penalty_weight * self.last_uncertainty
+        reward = 10.0 * efficiency + 2.0 * pressure_recovery - movement_penalty - uncertainty_penalty
         terminated = bool(unstart_probability > 0.8)
         if terminated:
             reward -= 1000.0
@@ -101,15 +113,23 @@ class ScramjetInletEnv(gym.Env):
             "efficiency": float(efficiency),
             "ramp_angle_deg": float(self.ramp_angle),
             "angle_rate_deg_per_step": float(self.angle_rate),
+            "surrogate_uncertainty": float(self.last_uncertainty),
         }
         return observation, float(reward), terminated, truncated, info
 
     def _observe(self) -> np.ndarray:
         density = float(isa_density_kg_m3(np.asarray([self.altitude], dtype=np.float32))[0])
         inputs = np.asarray([self.mach, self.altitude, density, self.ramp_angle], dtype=np.float32)
-        fields, metrics = self.predictor.predict(inputs)
-        self.last_fields = fields[0].astype(np.float32)
-        self.last_metrics = metrics[0].astype(np.float32)
+        prediction = self.predictor.predict(inputs)
+        if self.uses_ensemble:
+            self.last_fields = prediction["field_mean"][0].astype(np.float32)
+            self.last_metrics = prediction["metric_mean"][0].astype(np.float32)
+            self.last_uncertainty = float(np.mean(prediction["metric_std"][0]))
+        else:
+            fields, metrics = prediction
+            self.last_fields = fields[0].astype(np.float32)
+            self.last_metrics = metrics[0].astype(np.float32)
+            self.last_uncertainty = 0.0
         sensors = self._downsample(self.last_fields).reshape(-1)
         state = np.asarray(
             [

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scramjet Inlet Control Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="visual-panel">
+        <div class="topbar">
+          <div>
+            <h1>Scramjet Inlet Control</h1>
+            <p>Interactive surrogate-style visualization of ramp control, shock position, and unstart risk.</p>
+          </div>
+          <div class="mode-pill" id="modeLabel">Manual</div>
+        </div>
+
+        <div class="scene-card">
+          <canvas id="inletCanvas" width="1100" height="560" aria-label="Scramjet inlet visualization"></canvas>
+        </div>
+
+        <div class="metric-grid">
+          <article>
+            <span>Ramp Angle</span>
+            <strong id="rampAngleValue">10.0 deg</strong>
+          </article>
+          <article>
+            <span>Target Angle</span>
+            <strong id="targetAngleValue">9.2 deg</strong>
+          </article>
+          <article>
+            <span>Shock Error</span>
+            <strong id="shockErrorValue">0.00</strong>
+          </article>
+          <article>
+            <span>Pressure Recovery</span>
+            <strong id="pressureRecoveryValue">0.90</strong>
+          </article>
+          <article>
+            <span>Efficiency</span>
+            <strong id="efficiencyValue">0.91</strong>
+          </article>
+          <article>
+            <span>Unstart Risk</span>
+            <strong id="unstartValue">0.02</strong>
+          </article>
+        </div>
+      </section>
+
+      <aside class="control-panel">
+        <section class="control-group">
+          <h2>Controller</h2>
+          <div class="segmented">
+            <button class="active" data-mode="manual">Manual</button>
+            <button data-mode="baseline">Baseline</button>
+            <button data-mode="rl">RL Policy</button>
+          </div>
+          <p class="hint">
+            Baseline tracks a Mach-scheduled ramp angle. RL Policy is a demonstrator that reacts more aggressively to
+            shock error and unstart risk.
+          </p>
+        </section>
+
+        <section class="control-group">
+          <h2>Flight Condition</h2>
+          <label>
+            <span>Mach Number <b id="machReadout">6.0</b></span>
+            <input id="mach" type="range" min="4" max="8" step="0.05" value="6" />
+          </label>
+          <label>
+            <span>Altitude <b id="altitudeReadout">20000 m</b></span>
+            <input id="altitude" type="range" min="10000" max="30000" step="250" value="20000" />
+          </label>
+        </section>
+
+        <section class="control-group">
+          <h2>Inlet Ramp</h2>
+          <label>
+            <span>Manual Ramp Angle <b id="manualAngleReadout">10.0 deg</b></span>
+            <input id="manualAngle" type="range" min="4" max="18" step="0.1" value="10" />
+          </label>
+          <label>
+            <span>Actuator Speed <b id="speedReadout">0.35</b></span>
+            <input id="actuatorSpeed" type="range" min="0.05" max="1" step="0.05" value="0.35" />
+          </label>
+          <div class="button-row">
+            <button id="stepButton">Step</button>
+            <button id="playButton">Play</button>
+            <button id="resetButton">Reset</button>
+          </div>
+        </section>
+
+        <section class="control-group">
+          <h2>What Affects It</h2>
+          <ul class="effect-list" id="effectList"></ul>
+        </section>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

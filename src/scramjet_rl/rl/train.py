@@ -22,11 +22,13 @@ def _env_config(raw: dict) -> EnvConfig:
         max_angle_rate_deg_per_step=float(raw.get("max_angle_rate_deg_per_step", 0.75)),
         min_ramp_angle_deg=float(raw.get("min_ramp_angle_deg", 4.0)),
         max_ramp_angle_deg=float(raw.get("max_ramp_angle_deg", 18.0)),
+        uncertainty_penalty_weight=float(raw.get("uncertainty_penalty_weight", 0.0)),
     )
 
 
 def train_agent(config: dict) -> Path:
-    env = ScramjetInletEnv(config["surrogate_path"], _env_config(config.get("env", {})))
+    surrogate_path = config.get("surrogate_paths", config["surrogate_path"])
+    env = ScramjetInletEnv(surrogate_path, _env_config(config.get("env", {})))
     check_env(env, warn=True)
     algorithm = str(config.get("algorithm", "sac")).lower()
     if algorithm == "sac":

@@ -49,6 +49,8 @@ scramjet train-surrogate --config configs\surrogate.yaml
 scramjet train-agent --config configs\rl_sac.yaml
 ```
 
+For a professor-facing technical summary, see [REPORT.md](REPORT.md).
+
 ## OpenFOAM Workflow
 
 Create a CFD sweep manifest:
@@ -102,6 +104,30 @@ python scripts\materialize_cfd_cases.py --manifest cfd\replay_manifest.csv --tem
 python scripts\plot_dataset_sample.py --dataset data\processed\synthetic_inlet.h5 --index 0 --output outputs\sample_fields.png
 ```
 
+## Interactive Inlet Dashboard
+
+The project includes a browser-based dashboard for explaining how inlet ramp angle, Mach number, altitude, shock position, pressure recovery, efficiency, and unstart risk interact.
+
+Run:
+
+```powershell
+scramjet open-dashboard
+```
+
+or open the HTML file directly:
+
+```text
+apps/inlet_dashboard/index.html
+```
+
+Dashboard modes:
+
+- `Manual`: the user directly controls ramp angle.
+- `Baseline`: the ramp tracks a Mach-scheduled target angle.
+- `RL Policy`: a demonstrator controller reacts to shock error and unstart risk.
+
+This dashboard is an explanatory visualization. It uses the same simplified relationships as the synthetic environment, not a validated CFD solver.
+
 ## Importing Real Data
 
 The synthetic dataset is only for pipeline testing. For actual research use, import CFD or experimental data into the same HDF5 schema:
@@ -140,6 +166,7 @@ Run:
 ```powershell
 scramjet train-surrogate --config configs\surrogate_real.yaml
 scramjet evaluate-surrogate --dataset data\processed\openfoam_inlet.h5 --checkpoint models\surrogate_real_unet.pt --plot-output outputs\real_surrogate_eval.png
+scramjet surrogate-report --dataset data\processed\openfoam_inlet.h5 --checkpoint models\surrogate_real_unet.pt --output-dir outputs\reports\real_surrogate_unet
 ```
 
 If OpenFOAM sampled outputs are available as CSV files named by case, use this input format:
@@ -164,6 +191,13 @@ scramjet validate-dataset data\processed\openfoam_inlet.h5
 ```
 
 For non-OpenFOAM sources, write the four required arrays directly to HDF5. The ML and RL stages do not depend on OpenFOAM specifically once the HDF5 schema is satisfied.
+
+You can import `.npy`, `.npz`, or CSV arrays directly:
+
+```powershell
+scramjet import-arrays --inputs inputs.npy --pressure pressure.npy --temperature temperature.npy --metrics metrics.npy --output data\processed\real_data.h5
+scramjet create-splits --dataset data\processed\real_data.h5 --output-dir data\splits\real_data --seed 7
+```
 
 ## CFD Integration Contract
 
@@ -230,6 +264,14 @@ algorithm: ppo
 ```
 
 The environment includes actuator lag, rate limits, movement penalty, shock-efficiency reward, and unstart termination.
+
+Baseline comparison:
+
+```powershell
+scramjet evaluate-baseline --config configs\rl_sac.yaml --episodes 5 --rollout-csv outputs\baseline_rollouts.csv
+```
+
+Use this before claiming that SAC/PPO improves inlet control.
 
 ## Scope
 

@@ -11,8 +11,10 @@ dist/
 data/raw_openfoam/
 data/processed/
 data/runs/
+data/splits/
 models/
 outputs/
+cfd/replay_manifest.csv
 *.h5
 *.pt
 *.zip
