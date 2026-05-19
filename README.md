@@ -49,7 +49,7 @@ scramjet train-surrogate --config configs\surrogate.yaml
 scramjet train-agent --config configs\rl_sac.yaml
 ```
 
-For a professor-facing technical summary, see [REPORT.md](REPORT.md).
+For a technical summary, see [REPORT.md](REPORT.md).
 
 ## OpenFOAM Workflow
 
