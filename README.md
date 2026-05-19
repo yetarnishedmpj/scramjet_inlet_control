@@ -16,8 +16,8 @@ configs/                 YAML configs for data, surrogate, and RL runs
 cfd/templates/           OpenFOAM case template placeholder
 src/scramjet_rl/cfd/     CFD sweep and postprocessing interfaces
 src/scramjet_rl/data/    Dataset generation and loading
-src/scramjet_rl/surrogate/  PyTorch surrogate models and training
-src/scramjet_rl/envs/    Gymnasium environment
+src/scramjet_rl/surrogate/  PyTorch surrogate models (with CBAM/GroupNorm) and training
+src/scramjet_rl/envs/    Gymnasium environment (configurable rewards)
 src/scramjet_rl/rl/      Stable Baselines3 training/evaluation scripts
 tests/                   Smoke tests
 ```
@@ -106,7 +106,7 @@ python scripts\plot_dataset_sample.py --dataset data\processed\synthetic_inlet.h
 
 ## Interactive Inlet Dashboard
 
-The project includes a browser-based dashboard for explaining how inlet ramp angle, Mach number, altitude, shock position, pressure recovery, efficiency, and unstart risk interact.
+The project includes a browser-based dashboard for explaining how inlet ramp angle, Mach number, altitude, shock position, pressure recovery, efficiency, and unstart risk interact. It features a modern Cyber-Aerospace aesthetic with dynamic, high-fidelity canvas rendering of oblique shocks and pressure fields.
 
 Run:
 
@@ -247,7 +247,7 @@ or:
 model_type: metric_mlp
 ```
 
-`unet` and `resnet` are better next candidates once real CFD data exists. `metric_mlp` is useful when the RL loop only needs reward metrics and not full fields. `EnsembleSurrogatePredictor` can combine multiple checkpoints and return mean/std estimates for uncertainty-aware analysis.
+`unet` and `resnet` models are enhanced with Convolutional Block Attention Modules (CBAM) and Group Normalization layers to better capture high-frequency boundary layers and shockwaves from CFD data. `metric_mlp` is useful when the RL loop only needs reward metrics and not full fields. `EnsembleSurrogatePredictor` can combine multiple checkpoints and return mean/std estimates for uncertainty-aware analysis.
 
 ## RL Options
 
