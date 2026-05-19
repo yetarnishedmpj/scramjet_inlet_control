@@ -24,6 +24,11 @@ class EnvConfig:
     min_ramp_angle_deg: float = 4.0
     max_ramp_angle_deg: float = 18.0
     uncertainty_penalty_weight: float = 0.0
+    reward_efficiency_weight: float = 10.0
+    reward_pressure_recovery_weight: float = 2.0
+    reward_unstart_penalty: float = 1000.0
+    reward_movement_rate_weight: float = 0.25
+    reward_movement_accel_weight: float = 0.1
 
 
 class ScramjetInletEnv(gym.Env):
@@ -99,12 +104,20 @@ class ScramjetInletEnv(gym.Env):
 
         observation = self._observe()
         shock_error, pressure_recovery, unstart_probability, efficiency = self.last_metrics
-        movement_penalty = 0.25 * abs(self.angle_rate) + 0.1 * abs(self.angle_rate - previous_rate)
+        movement_penalty = (
+            self.config.reward_movement_rate_weight * abs(self.angle_rate)
+            + self.config.reward_movement_accel_weight * abs(self.angle_rate - previous_rate)
+        )
         uncertainty_penalty = self.config.uncertainty_penalty_weight * self.last_uncertainty
-        reward = 10.0 * efficiency + 2.0 * pressure_recovery - movement_penalty - uncertainty_penalty
+        reward = (
+            self.config.reward_efficiency_weight * efficiency
+            + self.config.reward_pressure_recovery_weight * pressure_recovery
+            - movement_penalty
+            - uncertainty_penalty
+        )
         terminated = bool(unstart_probability > 0.8)
         if terminated:
-            reward -= 1000.0
+            reward -= self.config.reward_unstart_penalty
         truncated = self.step_count >= self.config.max_steps
         info = {
             "shock_error": float(shock_error),

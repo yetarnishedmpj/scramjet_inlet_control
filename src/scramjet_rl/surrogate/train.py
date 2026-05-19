@@ -49,6 +49,7 @@ def train_surrogate(config: dict) -> Path:
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(config.get("learning_rate", 1e-3)))
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
     mse = nn.MSELoss()
     batch_size = int(config.get("batch_size", 32))
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -60,6 +61,9 @@ def train_surrogate(config: dict) -> Path:
     log_dir = Path(str(config.get("log_dir", "outputs/experiments"))) / run_id
     history_path = log_dir / "surrogate_history.csv"
     epochs = int(config.get("epochs", 5))
+    best_val_loss = float("inf")
+    best_state = None
+
     for epoch in trange(epochs, desc="training surrogate"):
         model.train()
         train_losses = []
@@ -73,27 +77,42 @@ def train_surrogate(config: dict) -> Path:
             loss.backward()
             optimizer.step()
             train_losses.append(float(loss.detach().cpu()))
+
+        model.eval()
+        val_losses = []
+        with torch.no_grad():
+            for inputs, fields, metrics in val_loader:
+                inputs = inputs.to(device)
+                fields = fields.to(device)
+                metrics = metrics.to(device)
+                pred_fields, pred_metrics = model(inputs)
+                v_loss = field_weight * mse(pred_fields, fields) + metric_weight * mse(pred_metrics, metrics)
+                val_losses.append(float(v_loss.detach().cpu()))
+
+        mean_train = float(np.mean(train_losses))
+        mean_val = float(np.mean(val_losses))
+        scheduler.step(mean_val)
+
+        if mean_val < best_val_loss:
+            best_val_loss = mean_val
+            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
         append_csv(
             history_path,
             {
                 "epoch": epoch,
-                "train_loss": float(np.mean(train_losses)),
+                "train_loss": mean_train,
+                "val_loss": mean_val,
+                "lr": optimizer.param_groups[0]["lr"],
             },
         )
 
-    model.eval()
-    val_losses = []
-    with torch.no_grad():
-        for inputs, fields, metrics in val_loader:
-            inputs = inputs.to(device)
-            fields = fields.to(device)
-            metrics = metrics.to(device)
-            pred_fields, pred_metrics = model(inputs)
-            val_losses.append(float(mse(pred_fields, fields) + metric_weight * mse(pred_metrics, metrics)))
+    if best_state is not None:
+        model.load_state_dict(best_state)
 
     model_path = ensure_parent(config["model_path"])
     checkpoint = {
-        "model_state": model.cpu().state_dict(),
+        "model_state": best_state if best_state else model.cpu().state_dict(),
         "input_mean": torch.as_tensor(dataset.input_mean),
         "input_std": torch.as_tensor(dataset.input_std),
         "field_mean": torch.as_tensor(dataset.field_mean),
@@ -101,7 +120,7 @@ def train_surrogate(config: dict) -> Path:
         "height": height,
         "width": width,
         "model_type": model_type,
-        "validation_loss": float(np.mean(val_losses)),
+        "validation_loss": best_val_loss if best_state else float(np.mean(val_losses)),
     }
     torch.save(checkpoint, model_path)
     write_json(
