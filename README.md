@@ -16,9 +16,9 @@ configs/                 YAML configs for data, surrogate, and RL runs
 cfd/templates/           OpenFOAM case template placeholder
 src/scramjet_rl/cfd/     CFD sweep and postprocessing interfaces
 src/scramjet_rl/data/    Dataset generation and loading
-src/scramjet_rl/surrogate/  PyTorch surrogate models (with CBAM/GroupNorm) and training
-src/scramjet_rl/envs/    Gymnasium environment (configurable rewards)
-src/scramjet_rl/rl/      Stable Baselines3 training/evaluation scripts
+src/scramjet_rl/surrogate/  PyTorch surrogate models (CBAM/GroupNorm) + ONNX exporter
+src/scramjet_rl/envs/    Gymnasium environment (Dict obs, configurable rewards)
+src/scramjet_rl/rl/      Stable Baselines3 training with CNN-MLP feature extractor
 tests/                   Smoke tests
 ```
 
@@ -263,7 +263,12 @@ or:
 algorithm: ppo
 ```
 
-The environment includes actuator lag, rate limits, movement penalty, shock-efficiency reward, and unstart termination.
+The environment includes actuator lag, rate limits, movement penalty, shock-efficiency reward, and unstart termination. The observation space is a **Dict** with two keys:
+
+- `"state"` – scalar flight-condition features (Mach, altitude, density, ramp angle, rate).
+- `"sensors"` – 2-channel field patch `[pressure, temperature]` at sensor resolution.
+
+The RL policy uses a **custom CNN-MLP feature extractor** (`InletCNNExtractor`) that processes the sensor fields spatially via a small convolutional network before concatenating with the scalar state embedding. This lets the agent perceive shockwave structure rather than just scalar metrics.
 
 Baseline comparison:
 
@@ -272,6 +277,23 @@ scramjet evaluate-baseline --config configs\rl_sac.yaml --episodes 5 --rollout-c
 ```
 
 Use this before claiming that SAC/PPO improves inlet control.
+
+## ONNX Export
+
+Export any trained surrogate to ONNX for use with ONNX Runtime or ONNX.js:
+
+```powershell
+scramjet export-onnx --checkpoint models\surrogate_unet.pt
+# writes models\surrogate_unet.onnx and validates outputs automatically
+
+scramjet export-onnx --checkpoint models\surrogate_cnn.pt --output models\surrogate_cnn.onnx --opset 17
+```
+
+The exported graph accepts `[batch, 4]` float32 inputs and produces two outputs: `fields [batch, 2, H, W]` and `metrics [batch, 4]`. Install `onnxruntime` to enable output validation at export time:
+
+```powershell
+pip install onnxruntime
+```
 
 ## Scope
 

@@ -31,7 +31,20 @@ class EnvConfig:
     reward_movement_accel_weight: float = 0.1
 
 
+# Number of scalar state features in the "state" observation key
+STATE_DIM: int = 5
+
+
 class ScramjetInletEnv(gym.Env):
+    """Scramjet inlet Gymnasium environment.
+
+    Observation space is a Dict with two keys:
+        ``"state"``   – 1-D float32 array of scalar flight-condition features
+                        [mach_norm, altitude_norm, density, ramp_norm, rate_norm]
+        ``"sensors"`` – 3-D float32 tensor [2, sensor_height, sensor_width]
+                        containing normalised pressure and temperature fields
+    """
+
     metadata = {"render_modes": []}
 
     def __init__(
@@ -47,12 +60,22 @@ class ScramjetInletEnv(gym.Env):
         else:
             self.predictor = SurrogatePredictor(surrogate_path)
             self.uses_ensemble = False
-        sensor_size = 2 * self.config.sensor_height * self.config.sensor_width
-        self.observation_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(5 + sensor_size,),
-            dtype=np.float32,
+
+        self.observation_space = spaces.Dict(
+            {
+                "state": spaces.Box(
+                    low=-np.inf,
+                    high=np.inf,
+                    shape=(STATE_DIM,),
+                    dtype=np.float32,
+                ),
+                "sensors": spaces.Box(
+                    low=-np.inf,
+                    high=np.inf,
+                    shape=(2, self.config.sensor_height, self.config.sensor_width),
+                    dtype=np.float32,
+                ),
+            }
         )
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
         self.rng = np.random.default_rng()
@@ -74,8 +97,7 @@ class ScramjetInletEnv(gym.Env):
         self.altitude = float(self.rng.uniform(*self.config.initial_altitude_range))
         self.ramp_angle = float(self.rng.uniform(*self.config.initial_ramp_angle_range))
         self.angle_rate = 0.0
-        observation = self._observe()
-        return observation, {}
+        return self._observe(), {}
 
     def step(self, action: np.ndarray):
         previous_rate = self.angle_rate
@@ -130,7 +152,7 @@ class ScramjetInletEnv(gym.Env):
         }
         return observation, float(reward), terminated, truncated, info
 
-    def _observe(self) -> np.ndarray:
+    def _observe(self) -> dict[str, np.ndarray]:
         density = float(isa_density_kg_m3(np.asarray([self.altitude], dtype=np.float32))[0])
         inputs = np.asarray([self.mach, self.altitude, density, self.ramp_angle], dtype=np.float32)
         prediction = self.predictor.predict(inputs)
@@ -143,7 +165,7 @@ class ScramjetInletEnv(gym.Env):
             self.last_fields = fields[0].astype(np.float32)
             self.last_metrics = metrics[0].astype(np.float32)
             self.last_uncertainty = 0.0
-        sensors = self._downsample(self.last_fields).reshape(-1)
+        sensors = self._downsample(self.last_fields)
         state = np.asarray(
             [
                 self.mach / 8.0,
@@ -154,7 +176,7 @@ class ScramjetInletEnv(gym.Env):
             ],
             dtype=np.float32,
         )
-        return np.concatenate([state, sensors.astype(np.float32)])
+        return {"state": state, "sensors": sensors.astype(np.float32)}
 
     def _downsample(self, fields: np.ndarray) -> np.ndarray:
         _, height, width = fields.shape

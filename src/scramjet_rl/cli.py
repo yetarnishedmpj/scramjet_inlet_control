@@ -89,6 +89,12 @@ def main() -> None:
     replay.add_argument("--rollout-csv", required=True)
     replay.add_argument("--output", default="cfd/replay_manifest.csv")
 
+    export_onnx = subparsers.add_parser("export-onnx")
+    export_onnx.add_argument("--checkpoint", required=True, help="Path to .pt surrogate checkpoint")
+    export_onnx.add_argument("--output", default=None, help="Destination .onnx file (default: same name as checkpoint)")
+    export_onnx.add_argument("--opset", type=int, default=17, help="ONNX opset version")
+    export_onnx.add_argument("--no-validate", action="store_true", help="Skip ONNX output validation")
+
     args = parser.parse_args()
     _dispatch(args)
 
@@ -208,6 +214,17 @@ def _dispatch(args: argparse.Namespace) -> None:
         from scramjet_rl.cfd.replay import rollout_to_manifest
 
         print(f"Wrote replay manifest to {rollout_to_manifest(args.rollout_csv, args.output)}")
+    elif args.command == "export-onnx":
+        from pathlib import Path
+
+        from scramjet_rl.surrogate.export import export_surrogate_to_onnx
+
+        ckpt = Path(args.checkpoint)
+        out = Path(args.output) if args.output else ckpt.with_suffix(".onnx")
+        result = export_surrogate_to_onnx(
+            ckpt, out, opset_version=args.opset, validate=not args.no_validate
+        )
+        print(f"Exported ONNX model to {result}")
 
 
 if __name__ == "__main__":

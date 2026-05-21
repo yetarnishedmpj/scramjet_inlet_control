@@ -10,6 +10,7 @@ from stable_baselines3.common.env_checker import check_env
 from scramjet_rl.config import ensure_parent
 from scramjet_rl.envs.scramjet_inlet_env import EnvConfig, ScramjetInletEnv
 from scramjet_rl.logging import append_csv, timestamp
+from scramjet_rl.rl.feature_extractor import InletCNNExtractor
 
 
 class RewardLoggerCallback(BaseCallback):
@@ -55,6 +56,17 @@ def _env_config(raw: dict) -> EnvConfig:
     )
 
 
+def _policy_kwargs(config: dict) -> dict:
+    """Build SB3 policy_kwargs that wire in the CNN feature extractor."""
+    return {
+        "features_extractor_class": InletCNNExtractor,
+        "features_extractor_kwargs": {
+            "cnn_out_dim": int(config.get("cnn_out_dim", 64)),
+            "state_out_dim": int(config.get("state_out_dim", 32)),
+        },
+    }
+
+
 def train_agent(config: dict) -> Path:
     surrogate_path = config.get("surrogate_paths", config["surrogate_path"])
     env = ScramjetInletEnv(surrogate_path, _env_config(config.get("env", {})))
@@ -70,10 +82,11 @@ def train_agent(config: dict) -> Path:
 
     if algorithm == "sac":
         model = SAC(
-            "MlpPolicy",
+            "MultiInputPolicy",
             env,
             verbose=1,
             seed=seed,
+            policy_kwargs=_policy_kwargs(config),
             learning_starts=int(config.get("learning_starts", 100)),
             batch_size=int(config.get("batch_size", 64)),
             buffer_size=int(config.get("buffer_size", 100000)),
@@ -84,10 +97,11 @@ def train_agent(config: dict) -> Path:
         )
     elif algorithm == "ppo":
         model = PPO(
-            "MlpPolicy",
+            "MultiInputPolicy",
             env,
             verbose=1,
             seed=seed,
+            policy_kwargs=_policy_kwargs(config),
             n_steps=int(config.get("n_steps", 2048)),
             batch_size=int(config.get("batch_size", 64)),
             n_epochs=int(config.get("n_epochs", 10)),
